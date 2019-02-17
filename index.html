@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Meshes</title>
+ 
+	<script id="vshader" type="x-shader/x-vertex">
+	attribute vec4 vPosition;
+	uniform mat4 projectionMatrix;
+	uniform mat4 modelMatrix;
+	attribute vec4 vColor;
+	varying vec4 fColor;
+
+	void main() {
+		gl_Position = projectionMatrix * modelMatrix * vPosition;	// Point position
+  		gl_PointSize = 10.0;		// Point size
+  		fColor = vColor;
+  	}
+	</script>
+	
+	<script id="fshader" type="x-shader/x-fragment">
+	precision mediump float;
+	varying vec4 fColor;
+
+	void main() 
+	{
+		gl_FragColor = fColor;	// Point color
+  	}
+	</script>
+		
+    <script src="lib/webgl-utils.js"></script>
+    <script src="lib/initShaders.js"></script>
+    <script src="lib/MV.js"></script>
+    
+    <script src="example.js"></script>
+
+  </head>
+ 
+  <body onload="main()">
+  
+  	<div style="text-align: center">
+	  
+	    <canvas id="webgl" width="800" height="800" style="border: 1px solid black;">
+	    	Please use a browser that supports the "canvas" tag.
+	    </canvas>
+	
+	</div>
+
+  </body>
+</html>
