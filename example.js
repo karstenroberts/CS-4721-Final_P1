@@ -1,53 +1,87 @@
-var points;
-var colors;
-
 var gl;
 
 var fovy = 30.0;  // Field-of-view in Y direction angle (in degrees)
 var aspect;       // Viewport aspect ratio
 var program;
+let personalRot;
 
 var mvMatrix, pMatrix;
 var modelView, projection;
 var eye;
 
+// View at and up vectors
 const at = vec3(0.0, -2.0, 0.0);
 const up = vec3(0.0, 1.0, 0.0);
 
+// Coords of starting tetrahedron for spheres
 const va = vec4(0.0, 0.0, -1.0,1.5);
 const vb = vec4(0.0, 0.942809, 0.333333, 1.5);
 const vc = vec4(-0.816497, -0.471405, 0.333333, 1.5);
 const vd = vec4(0.816497, -0.471405, 0.333333,1.5);
 
+// Basic offset between shapes in mobile
 const spacing = -2.0;
+
+// Hierarchy stack
 let stack = [];
 
-const spheres = tetrahedron(va, vb, vc, vd, 5);
+// Generate sphere polygon only once (can be reused)
+const spheres = tetrahedron(va, vb, vc, vd, 4);
+
+// Generate cube only once
 const cubes = cube();
+
+// Generate pyramid only once (base case of circle)
 const mobileRoot = tetrahedron(va, vb, vc, vd, 0);
 
+// Light properties
 var lightPosition = vec4(1.0, 5.0, 10.0, 0.0 );
 var lightAmbient = vec4(0.4, 0.4, 0.4, 1.0 );
 var lightDiffuse = vec4( .5, .5, .5, 1.0 );
 var lightSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 
+// Material properties
 var materialAmbient = vec4( 1.0, 1.0, 1.0, 1.0 );
 var materialDiffuse = vec4( 1.0, 1.0, 1.0, 1.0 );
 var materialSpecular = vec4( 1.0, 1.0, 1.0, 1.0 );
 var materialShininess = 5.0;
+
+// Value for spotlight width, or similarity of face normal to light direction
 let spotSim = .99;
 
+// "P" was pressed
 let spotIncrease = false;
+// "p" was pressed
 let spotDecrease = false;
+// toggled by "M" or "m", vertex shading if false, face shading if true
 let faceShading = false;
-let shiftDown = false;
 
+// Generate bar for top level
 const topBars = bars(1);
+// Generate bar for middle level
 const middleBars = bars(.5);
+// Generate bar for bottom level
 const bottomBars = bars(0);
 
+// Amount to deviate off of normal rotation
 let alpha = 0;
 
+// Available color options
+const color = {
+    "RED": vec4(1.0, 0.0, 0.0, 1.0),
+    "BLUE":  vec4(0.0, 0.0, 1.0, 1.0),
+    "MAGENTA": vec4(1.0, 0.0, 1.0, 1.0),
+    "GREEN": vec4(0.0, 1.0, 0.0, 1.0),
+    "TEAL": vec4(0.0, 0.7, 0.8, 1.0),
+    "WHITE": vec4(1.0, 1.0, 1.0, 1.0),
+    "BLACK": vec4(0.0, 0.0, 0.0, 1.0),
+    "ORANGE": vec4(1,0.4,0.2)
+};
+
+/**
+ * Handler for key down event
+ * @param e event
+ */
 function keyDownHandler(e) {
     console.log(shiftDown);
   switch(e.key){
@@ -68,17 +102,9 @@ function keyDownHandler(e) {
   }
 }
 
-const color = {
-    "RED": vec4(1.0, 0.0, 0.0, 1.0),
-    "BLUE":  vec4(0.0, 0.0, 1.0, 1.0),
-    "MAGENTA": vec4(1.0, 0.0, 1.0, 1.0),
-    "GREEN": vec4(0.0, 1.0, 0.0, 1.0),
-    "TEAL": vec4(0.0, 0.7, 0.8, 1.0),
-    "WHITE": vec4(1.0, 1.0, 1.0, 1.0),
-    "BLACK": vec4(0.0, 0.0, 0.0, 1.0),
-    "ORANGE": vec4(1,0.4,0.2)
-};
-
+/**
+ * Called on body load, and only runs once. Sets up canvas, shaders, and lighting.
+ */
 function main()
 {
     window.addEventListener("keydown", keyDownHandler, true);
@@ -127,10 +153,6 @@ function main()
     gl.uniform1f(gl.getUniformLocation(program,
         "shininess"), materialShininess);
 
-
-    points = [];
-	colors = [];
-
     projection = gl.getUniformLocation(program, "projectionMatrix");
     modelView = gl.getUniformLocation(program, "modelMatrix");
 
@@ -138,6 +160,11 @@ function main()
 
     render();
 }
+
+/**********************************************************************************************************************
+ * Following modified from Lighting Example code. Only change is that instead of saving to global list, returns a JSON
+ * containing the list of points, list of vertex normals, and list of face normals. Also generates face normals.
+ *********************************************************************************************************************/
 
 function triangle(a, b, c) {
     let pointsArray = [];
@@ -201,6 +228,15 @@ function tetrahedron(a, b, c, d, n) {
     }
 }
 
+/*********************************************************************************************************************
+ *********************************************************************************************************************/
+
+
+/**
+ * Generates points for mobile frame
+ * @param factor Width of crossbar. If zero, no crossbar.
+ * @returns {Array} Array of points to draw
+ */
 function bars(factor) {
     let verts = [];
     if (factor !== 0) {
@@ -215,6 +251,11 @@ function bars(factor) {
     return verts;
 }
 
+/**********************************************************************************************************************
+ * Following modified from Hierarchy Example code. Only changes are it calculates face and vertex normals, and instead
+ * of saving to global list, returns a JSON containing the list of points, list of vertex normals, and list of face
+ * normals.
+ *********************************************************************************************************************/
 function cube()
 {
     var verts = [];
@@ -281,6 +322,15 @@ function quad(a, b, c, d)
     return {"pointsArray": verts, "faceNormalsArray": normals, "vertexNormalsArray": vertexNormals}
 }
 
+/*********************************************************************************************************************
+ *********************************************************************************************************************/
+
+/**
+ * Used to generate the face normals for spheres and cubes
+ * @param poly Three points making up the face
+ * @param ignore Which dimension to calculate
+ * @returns {number} Returns the calculated dimension
+ */
 function sum(poly, ignore) {
     let totalSum = 0;
     if (ignore === 0) {
@@ -299,59 +349,74 @@ function sum(poly, ignore) {
     return totalSum;
 }
 
-
-function render()
-{
+/**
+ * Render method that is called every draw, modified from Hierarchy Example
+ */
+function render() {
+    // increment alpha each render to animate
     alpha += .3;
-    let personalRot;
 
     pMatrix = perspective(fovy, aspect, .1, 20000);
     gl.uniformMatrix4fv( projection, false, flatten(pMatrix) );
     eye = vec3(0, 0, 30);
 
+    // Set up root transformations
     mvMatrix = lookAt(eye, at , up);
     mvMatrix = mult(mvMatrix, rotateY(alpha));
     gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));
+
+    // Draw green pyramid and its bars
     draw(topBars, color.WHITE, false);
     draw(mobileRoot, color.GREEN, true);
-    stack.push(mvMatrix);
+    stack.push(mvMatrix); // Push root to stack
     {
+        // Set up red sphere child transformations
         mvMatrix = mult(mvMatrix, mult(translate(2*spacing, spacing, 0), rotateY(-2*alpha)));
         gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));
         draw(middleBars, color.WHITE, false);
+
+        // Set up red sphere transformation (counterclockwise rotation)
         personalRot = mult(mvMatrix, rotateY(3*alpha));
         gl.uniformMatrix4fv(modelView, false, flatten(personalRot));
         draw(spheres, color.RED, true);
-        stack.push(mvMatrix);
+        stack.push(mvMatrix); // Push red to stack
         {
+            // Set up cube rotation
             mvMatrix = mult(mvMatrix, mult(translate(spacing, spacing, 0), rotateY(3*alpha)));
             gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));
+            // Draw
             draw(bottomBars, color.WHITE, false);
             draw(cubes, color.MAGENTA, true);
 
 
         }
-        mvMatrix = stack.pop();
-        stack.push(mvMatrix);
+        mvMatrix = stack.pop(); // pop red from stack
+        stack.push(mvMatrix); // push it back on to get value
         {
+            // Set up cube rotation
             mvMatrix = mult(mvMatrix, mult(translate(-spacing, spacing, 0), rotateY(3 * alpha)));
             gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));
+            // Draw
             draw(bottomBars, color.WHITE, false);
             draw(cubes, color.TEAL, true);
         }
-        stack.pop();
+        stack.pop(); // Pop red from stack
     }
-    mvMatrix = stack.pop();
-    stack.push(mvMatrix);
+    mvMatrix = stack.pop(); //Pop root from stack
+    stack.push(mvMatrix); // Push it back on to get value
     {
+        // Set up blue cube child rotation
         mvMatrix = mult(mvMatrix, mult(translate(-2*spacing, spacing, 0), rotateY(-2*alpha)));
         gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));
         draw(middleBars, color.WHITE, false);
+
+        // Set up blue cube transformation (counterclockwise rotation)
         personalRot = mult(mvMatrix, rotateY(3*alpha));
         gl.uniformMatrix4fv(modelView, false, flatten(personalRot));
         draw(cubes, color.BLUE, true);
-        stack.push(mvMatrix);
+        stack.push(mvMatrix); // Push blue to stack
         {
+            //Set up sphere rotation
             mvMatrix = mult(mvMatrix, mult(translate(spacing, spacing, 0), rotateY(3*alpha)));
             gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));
             draw(bottomBars, color.WHITE, false);
@@ -359,9 +424,10 @@ function render()
 
 
         }
-        mvMatrix = stack.pop();
-        stack.push(mvMatrix);
+        mvMatrix = stack.pop(); // pop blue from stack
+        stack.push(mvMatrix); // push it back on to get value
         {
+            //Set up sphere rotation
             mvMatrix = mult(mvMatrix, mult(translate(-spacing, spacing, 0), rotateY(3 * alpha)));
             gl.uniformMatrix4fv(modelView, false, flatten(mvMatrix));
             draw(bottomBars, color.WHITE, false);
@@ -375,7 +441,12 @@ function render()
     requestAnimationFrame(render)
 }
 
-
+/**
+ * Draw given shape to the canvas
+ * @param shape list of points or json info of shape
+ * @param color what color to paint it
+ * @param poly is it a polygon or a line
+ */
 function draw(shape, color, poly) {
     let normals = [];
     let shapePoints = [];
