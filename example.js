@@ -83,7 +83,6 @@ const color = {
  * @param e event
  */
 function keyDownHandler(e) {
-    console.log(shiftDown);
   switch(e.key){
       case "m":
           faceShading = false;
