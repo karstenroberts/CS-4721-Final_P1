@@ -6,15 +6,56 @@
  
 	<script id="vshader" type="x-shader/x-vertex">
 	attribute vec4 vPosition;
+	attribute vec4 vNormal;
+
+	uniform vec4 diffuseProduct, specularProduct, ambientProduct;
+	uniform vec4 lightPosition;
 	uniform mat4 projectionMatrix;
 	uniform mat4 modelMatrix;
-	attribute vec4 vColor;
+	uniform float shininess;
+	uniform float spotSim;
 	varying vec4 fColor;
+	attribute vec4 vColor;
 
 	void main() {
-		gl_Position = projectionMatrix * modelMatrix * vPosition;	// Point position
-  		gl_PointSize = 10.0;		// Point size
-  		fColor = vColor;
+		gl_Position = (projectionMatrix * modelMatrix * vPosition);	// Point position
+
+        //Convert the vertex position to eye coordinates
+        vec3 pos = (modelMatrix * vPosition).xyz;
+
+        //Calculate L
+        vec3 L = normalize(lightPosition.xyz - pos);
+
+        //Calculate V
+        vec3 V = normalize(-pos);
+
+        //Convert vertex normal to eye coordinates
+        vec3 N = normalize(modelMatrix * vNormal).xyz;
+
+        //Calculate reflection vector
+        vec3 R = (2.0 * dot(L, N) * N) - L;
+
+        float Kd = dot(L,N);
+        float Ks = pow(max(dot(V, R), 0.0), shininess);
+
+
+        vec4 diffuse = vec4(0,0,0,0);
+        vec4 specular = vec4(0,0,0,0);
+        vec4 ambient = ambientProduct;
+
+        vec3 lightDir = normalize(vec3(0, -.5, -3));
+
+        if(dot(L, -lightDir) > spotSim) {
+            diffuse = diffuseProduct * dot(L, N);;
+            specular = specularProduct * pow(max(dot(V, R), 0.0), shininess);
+        }
+
+        gl_Position = projectionMatrix * modelMatrix * vPosition;
+        fColor = (ambient + diffuse + specular) * vColor;
+        fColor.a = 1.0;
+        gl_PointSize = 10.0;
+        // Point size
+
   	}
 	</script>
 	
@@ -40,7 +81,7 @@
   
   	<div style="text-align: center">
 	  
-	    <canvas id="webgl" width="800" height="800" style="border: 1px solid black;">
+	    <canvas id="webgl" width="800" height="800" style="background-color:#000000; border: 1px solid black;" >
 	    	Please use a browser that supports the "canvas" tag.
 	    </canvas>
 	
